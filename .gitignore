@@ -1,3 +1,9 @@
 /target
 index.tar
 index.zip
+output.log
+out.png
+thumbnails
+.idea
+img
+Cargo.lock

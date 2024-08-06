@@ -1,45 +1,54 @@
-use ring::hmac::{Key, Tag};
-use ring::{hmac, rand};
-use ring::rand::SecureRandom;
-use ring::error::Unspecified;
+//在日志信息中包含时间戳
+use core::error;
+use std::error::Error;
+use std::io::Write;
+use chrono::Local;
+use env_logger::Builder;
+use log::LevelFilter;
+//log4rs 将日志输出配置到自定义位置。log4rs 可以使用外部 YAML 文件或生成器配置
+use log4rs::append::file::FileAppender;
+use log4rs::encode::pattern::PatternEncoder;
+use log4rs::config::{Appender, Config, Root};
 
-struct SendMsg<'a>{
-    message:&'a str,
-    signature:Tag
+//使用 Builder 创建自定义记录器配置
+//每个日志项调用 Local::now 以获取本地时区中的当前 DateTime，
+//并使用 DateTime::format 和 strftime::specifiers 来格式化最终日志中使用的时间戳。
+fn add_time(){
+    Builder::new()
+    .format(|buf,record|{
+        write!(buf,"{} [{}] - {}",Local::now().format("%Y-%m-%d %H:%M:%S"),record.level(),record.args())
+    })
+    .filter(None, LevelFilter::Info)
+    .init();
+    log::warn!("warn");
+    log::info!("info");
+    log::debug!("debug");
 }
-impl<'a> SendMsg<'a>{
-    fn new(message:&'a str,signature:Tag)->SendMsg{
-        SendMsg { message: message, signature: signature }
-    }
-}
-fn main() {
-    let (s,k)=signate("wodwadjaiowd").unwrap();
-    println!("{:?}",descrypt(s, k));
+fn setup_logger() -> Result<(), Box<dyn Error>> {
 
+
+    fern::Dispatch::new()
+        .format(move |out, message, record| {
+            out.finish(format_args!(
+                "{} [{}] - {}",
+                Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                message
+            ))
+        })
+        .level(LevelFilter::Debug)
+        .chain(fern::log_file("output.log")?) // 输出到文件
+        .apply()?;
+
+    Ok(())
 }
 
-fn signate(message:&str)->Result<(SendMsg,Key), Unspecified>{
-    //定义了一个长度为 48 的字节数组 key_value，用于存储 HMAC 密钥。
-    let mut key_value = [0; 48];
-    //创建了一个新的 SystemRandom 对象，它是一个安全的随机数生成器。
-    let rng = rand::SystemRandom::new();
-    //使用 SystemRandom 对象生成随机数，并填充到 key_value 数组中。如果随机数生成失败，那么 ? 操作符将导致函数立即返回一个错误。
-    rng.fill(&mut key_value)?;
-    //使用 key_value 数组创建了一个新的 HMAC 密钥。
-    let key = hmac::Key::new(hmac::HMAC_SHA256, &key_value);
-    //定义了一个字符串 message，它是将要被签名的消息
-    // let message = "Legitimate and important message.";
-    //使用 HMAC 密钥对消息进行签名，并返回签名。
-    let signature = hmac::sign(&key, message.as_bytes());
-    //验证消息的 HMAC 签名。如果签名验证失败，那么 ? 操作符将导致函数立即返回一个错误。
-    // hmac::verify(&key, message.as_bytes(), signature.as_ref())?;
-    Ok((SendMsg::new(message, signature),key))
-}
-fn descrypt(s:SendMsg,key:Key)->bool{
-    let message = s.message;
-    let signature = s.signature;
-    match hmac::verify(&key, message.as_bytes(), signature.as_ref()){
-        Ok(_) => true,
-        Err(_)=> false
-    }
+fn main() -> Result<(), Box<dyn Error>> {
+    setup_logger()?;
+
+    log::warn!("warn");
+    log::info!("info");
+    log::debug!("debug");
+
+    Ok(())
 }
